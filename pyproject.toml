@@ -16,8 +16,10 @@ dependencies = [
 	"mmh3",
 	"screed",
 	"mappy==2.26",
-	"networkx"
+	"networkx",
+	"tqdm"
 ]
+
 
 [project.scripts]
 pgqc = "pgqc.__init__:main"
