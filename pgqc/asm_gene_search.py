@@ -75,7 +75,8 @@ def PresAbsQC_CheckAsmForGeneSeq(i_Gene_PresAbs_DF, i_PG_Ref_NucSeqs,
 
 
 def SRAsm_PresAbsQC_CheckInLRAsm(i_SR_Gene_PresAbs_DF, i_SR_PG_Ref_NucSeqs,
-                                 i_SR_AsmFA_Dict, i_LR_AsmFA_Dict, i_SampleIDs ):
+                                 i_SR_AsmFA_Dict, i_LR_AsmFA_Dict, i_SampleIDs,
+                                 MinQueryCov = 0.9, MinQuerySeqID = 0.9):
 
 
     TotalNum_All_SR_MissingGenes = 0

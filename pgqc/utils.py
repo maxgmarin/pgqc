@@ -1,6 +1,7 @@
 # pgqc/utils.py
 
 import pandas as pd
+import screed 
 
 def parse_PresAbs_CSV_Panaroo(PresAbs_CSV_PATH):
     '''
