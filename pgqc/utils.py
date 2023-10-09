@@ -3,6 +3,30 @@
 import pandas as pd
 import screed 
 
+
+
+def parse_PresAbs_Rtab(PresAbs_Rtab_PATH):
+    '''
+    This function parsesthe `gene_presence_absence.csv` file output by Panaroo '''
+
+    i_Gene_PresAbs_DF = pd.read_csv(PresAbs_Rtab_PATH, sep = "\t")
+
+    ### Relabel Columns for presence/absence tracking
+    #i_Gene_PresAbs_DF.columns = [ x.split(".Bakta")[0] for x in i_Gene_PresAbs_DF.columns ]
+
+
+    ListOf_SampleID_Cols = list(i_Gene_PresAbs_DF.drop(["Gene"], axis=1).columns)
+    
+    i_Gene_PresAbs_DF["NumAsm_WiGene"] = i_Gene_PresAbs_DF[ListOf_SampleID_Cols].sum(axis = 1)
+
+    i_Gene_PresAbs_DF = i_Gene_PresAbs_DF.sort_values(by='NumAsm_WiGene', ascending=False)
+    i_Gene_PresAbs_DF = i_Gene_PresAbs_DF.set_index("Gene", drop=False)
+
+    return i_Gene_PresAbs_DF
+
+
+
+
 def parse_PresAbs_CSV_Panaroo(PresAbs_CSV_PATH):
     '''
     This function parsesthe `gene_presence_absence.csv` file output by Panaroo '''

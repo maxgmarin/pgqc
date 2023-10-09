@@ -4,7 +4,7 @@ import pandas as pd
 import tqdm as tqdm
 
 import mappy as mp
-
+from tqdm import tqdm
 
 #### Define function for parsing Mappy alignment hits
 
@@ -37,11 +37,43 @@ def parse_AlnHits_To_DF(i_AsmAlner, QuerySeq):
 
 
 
+
+
+
+def get_columns_excluding(df, exclude_columns):
+    """
+    Get all column names from a dataframe excluding the defined columns.
+
+    Parameters:
+    df (pd.DataFrame): The input dataframe.
+    exclude_columns (list): A list of column names to exclude.
+
+    Returns:
+    list: A list of column names excluding the defined columns.
+    """
+    return [col for col in df.columns if col not in exclude_columns]
+
+
+
 # General function for searching for gene DNA seqs in each assembly
 
 def PresAbsQC_CheckAsmForGeneSeq(i_Gene_PresAbs_DF, i_PG_Ref_NucSeqs,
-                                 i_AsmFA_Dict, i_SampleIDs):
+                                 i_AsmFA_Dict, i_SampleIDs,
+                                 MinQueryCov = 0.9, MinQuerySeqID = 0.9):
+    """
+    This function takes in a gene presence/absence dataframe, a dictionary of protein-coding gene reference sequences, a dictionary of sample-specific genome assemblies, a list of sample IDs, and optional parameters for minimum query coverage and minimum query sequence identity. It searches the genome assemblies for each absent gene in each sample, and updates the gene presence/absence dataframe accordingly. If a gene sequence is found with high confidence, the gene is marked as "not present" at the protein level but "present" at the DNA level. The function returns the updated gene presence/absence dataframe.
 
+    Args:
+    - i_Gene_PresAbs_DF: pandas DataFrame containing gene presence/absence information for each sample. The DataFrame should have the following columns: "Gene" (gene name), "NumTotalGenomes" (total number of genomes), and one column for each sample ID containing 0 (absent) or 1 (present) to indicate gene presence/absence.
+    - i_PG_Ref_NucSeqs: dictionary of protein-coding gene reference sequences. The keys are gene names and the values are nucleotide sequences.
+    - i_AsmFA_Dict: dictionary of sample-specific genome assemblies. The keys are sample IDs and the values are file paths to the genome assembly FASTA files.
+    - i_SampleIDs: list of sample IDs to process.
+    - MinQueryCov: optional float specifying the minimum query coverage required for a gene sequence alignment to be considered a hit. Default is 0.9.
+    - MinQuerySeqID: optional float specifying the minimum query sequence identity required for a gene sequence alignment to be considered a hit. Default is 0.9.
+
+    Returns:
+    - i_Gene_PresAbs_DF_Updated: pandas DataFrame containing updated gene presence/absence information for each sample. The DataFrame has the same columns as i_Gene_PresAbs_DF, plus an additional column "NumAsm_WiGene_DNASeq" containing the number of samples in which the gene sequence was found with high confidence.
+    """
                                      
     i_Gene_PresAbs_DF_Updated = i_Gene_PresAbs_DF.copy().set_index("Gene", drop=False)
     
@@ -60,7 +92,7 @@ def PresAbsQC_CheckAsmForGeneSeq(i_Gene_PresAbs_DF, i_PG_Ref_NucSeqs,
         
             i_AlnToAsm_DF = parse_AlnHits_To_DF(i_Alner_Asm, gene_seq)
 
-            i_AlnToAsm_Filt = i_AlnToAsm_DF[(i_AlnToAsm_DF["QueryCoverage"] > 0.9) & (i_AlnToAsm_DF["AlnSeqID"] > 0.9)]
+            i_AlnToAsm_Filt = i_AlnToAsm_DF[(i_AlnToAsm_DF["QueryCoverage"] > MinQueryCov) & (i_AlnToAsm_DF["AlnSeqID"] > MinQuerySeqID)]
             
             Num_Hits_Pass = i_AlnToAsm_Filt.shape[0]
     
@@ -77,7 +109,23 @@ def PresAbsQC_CheckAsmForGeneSeq(i_Gene_PresAbs_DF, i_PG_Ref_NucSeqs,
 def SRAsm_PresAbsQC_CheckInLRAsm(i_SR_Gene_PresAbs_DF, i_SR_PG_Ref_NucSeqs,
                                  i_SR_AsmFA_Dict, i_LR_AsmFA_Dict, i_SampleIDs,
                                  MinQueryCov = 0.9, MinQuerySeqID = 0.9):
+    """
+    Check the presence/absence of genes in short-read (SR) and long-read (LR) genome assemblies,
+    and update a gene presence/absence matrix accordingly.
 
+    Args:
+    - i_SR_Gene_PresAbs_DF: pandas DataFrame containing the gene presence/absence matrix for the short-read assembly analysis.
+    - i_SR_PG_Ref_NucSeqs: dictionary containing the reference nucleotide sequences for each gene.
+    - i_SR_AsmFA_Dict: dictionary containing the file paths of the SR genome assemblies for each sample.
+    - i_LR_AsmFA_Dict: dictionary containing the file paths of the LR genome assemblies for each sample.
+    - i_SampleIDs: list of sample IDs to process.
+    - MinQueryCov: minimum query coverage required for a sequence alignment to be considered valid (default: 0.9).
+    - MinQuerySeqID: minimum sequence identity required for a sequence alignment to be considered valid (default: 0.9).
+
+    Returns:
+    - i_SR_Gene_PresAbs_DF_Updated: pandas DataFrame containing the updated gene presence/absence matrix for each sample,
+    with additional column indicating the number of genome assemblies where the gene was found.
+    """
 
     TotalNum_All_SR_MissingGenes = 0
     TotalNum_All_Abs_InSRandLR = 0
@@ -110,12 +158,11 @@ def SRAsm_PresAbsQC_CheckInLRAsm(i_SR_Gene_PresAbs_DF, i_SR_PG_Ref_NucSeqs,
             i_AlnToSRAsm_DF = parse_AlnHits_To_DF(i_Alner_SRAsm, gene_seq)
             i_AlnToLRAsm_DF = parse_AlnHits_To_DF(i_Alner_LRAsm, gene_seq)
         
-            #i_AlnToSRAsm_Filt = i_AlnToSRAsm_DF[(i_AlnToSRAsm_DF["QueryCoverage"] > 0.9) & (i_AlnToSRAsm_DF["AlnSeqID"] > 0.9)]
-            #i_AlnToLRAsm_Filt = i_AlnToLRAsm_DF[(i_AlnToLRAsm_DF["QueryCoverage"] > 0.9) & (i_AlnToLRAsm_DF["AlnSeqID"] > 0.9)]
+            #i_AlnToSRAsm_Filt = i_AlnToSRAsm_DF[(i_AlnToSRAsm_DF["QueryCoverage"] > MinQueryCov) & (i_AlnToSRAsm_DF["AlnSeqID"] > MinQuerySeqID)]
+            #i_AlnToLRAsm_Filt = i_AlnToLRAsm_DF[(i_AlnToLRAsm_DF["QueryCoverage"] > MinQueryCov) & (i_AlnToLRAsm_DF["AlnSeqID"] > MinQuerySeqID)]
 
-                
-            Num_SR_Hits = i_AlnToSRAsm_DF[(i_AlnToSRAsm_DF["QueryCoverage"] > 0.9) & (i_AlnToSRAsm_DF["AlnSeqID"] > 0.9)].shape[0]
-            Num_LR_Hits = i_AlnToLRAsm_DF[(i_AlnToLRAsm_DF["QueryCoverage"] > 0.9) & (i_AlnToLRAsm_DF["AlnSeqID"] > 0.9)].shape[0]
+            Num_SR_Hits = i_AlnToSRAsm_DF[(i_AlnToSRAsm_DF["QueryCoverage"] > MinQueryCov) & (i_AlnToSRAsm_DF["AlnSeqID"] > MinQuerySeqID)].shape[0]
+            Num_LR_Hits = i_AlnToLRAsm_DF[(i_AlnToLRAsm_DF["QueryCoverage"] > MinQueryCov) & (i_AlnToLRAsm_DF["AlnSeqID"] > MinQuerySeqID)].shape[0]
     
             #if Num_SR_Hits > 0: # Update Pres/Abs matrix to have 2, meaning that the Protein-level annotation is Not present, BUT the gene sequence can be found with high confidence.
             #    i_SR_Gene_PresAbs_DF_Updated.loc[gene, i_SampleID] = 2
