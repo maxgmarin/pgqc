@@ -99,7 +99,7 @@ def PresAbsQC_CheckAsmForGeneSeq(i_Gene_PresAbs_DF, i_PG_Ref_NucSeqs,
             if Num_Hits_Pass > 0: # Update Pres/Abs matrix to have 2, meaning that the Protein-level annotation is Not present, BUT the gene sequence can be found with high confidence.
                 i_Gene_PresAbs_DF_Updated.loc[gene, i_SampleID] = 2
 
-    i_Gene_PresAbs_DF_Updated["NumAsm_WiGene_DNASeq"] = i_Gene_PresAbs_DF_Updated[ListOf_SampleID_Cols].applymap(lambda x: 1 if x > 0 else 0).sum(axis = 1)
+    i_Gene_PresAbs_DF_Updated["NumAsm_WiGene_DNASeq"] = i_Gene_PresAbs_DF_Updated[i_SampleIDs].applymap(lambda x: 1 if x > 0 else 0).sum(axis = 1)
 
     return i_Gene_PresAbs_DF_Updated
 

@@ -150,12 +150,17 @@ def parse_PG_Ref_FA(in_FA_PATH):
     NumParsedRecords = 0 
     
     for record in screed.open(in_FA_PATH):
-
+        
         NumParsedRecords += 1
         sequence = record.sequence
         name = record.name
         
-        dictOf_PG_Ref_Seqs[name] = sequence
+        if len(name.split(" ")) > 1:
+            short_name = " ".join(name.split(" ")[1:])
+        else:
+            short_name = name
+
+        dictOf_PG_Ref_Seqs[short_name] = sequence
 
     return dictOf_PG_Ref_Seqs
 
