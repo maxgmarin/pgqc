@@ -145,7 +145,7 @@ def make_NS_ClusterMerged_Pres_DF(i_Gene_PresAbs_DF, i_Filt_Cluster_DF):
     
     #PG_Pres_WiNSC_DF["NumAsm_WiGene"] = PG_Pres_WiNSC_DF[ListOf_SampleID_Cols].sum(axis = 1)
 
-    PG_Pres_WiNSC_DF["NumAsm_WiGene"] = PG_Pres_WiNSC_DF[ListOf_SampleID_Cols].map(lambda x: 1 if x > 0 else 0).sum(axis = 1)
+    PG_Pres_WiNSC_DF["NumAsm_WiGene"] = PG_Pres_WiNSC_DF[ListOf_SampleID_Cols].applymap(lambda x: 1 if x > 0 else 0).sum(axis = 1)
 
     
     PG_Pres_WiNSC_DF = PG_Pres_WiNSC_DF.sort_values(by='NumAsm_WiGene', ascending=False)
