@@ -6,6 +6,13 @@ import tqdm as tqdm
 import mappy as mp
 from tqdm import tqdm
 
+import logging
+# Set the logging level to INFO
+logging.basicConfig(level=logging.INFO)
+
+from pgqc.utils import parse_PresAbs_CSV_General, get_columns_excluding, parse_PG_Ref_FA
+
+
 #### Define function for parsing Mappy alignment hits
 
 def parse_AlnHits_To_DF(i_AsmAlner, QuerySeq):
@@ -40,19 +47,6 @@ def parse_AlnHits_To_DF(i_AsmAlner, QuerySeq):
 
 
 
-def get_columns_excluding(df, exclude_columns):
-    """
-    Get all column names from a dataframe excluding the defined columns.
-
-    Parameters:
-    df (pd.DataFrame): The input dataframe.
-    exclude_columns (list): A list of column names to exclude.
-
-    Returns:
-    list: A list of column names excluding the defined columns.
-    """
-    return [col for col in df.columns if col not in exclude_columns]
-
 
 
 # General function for searching for gene DNA seqs in each assembly
@@ -61,7 +55,18 @@ def PresAbsQC_CheckAsmForGeneSeq(i_Gene_PresAbs_DF, i_PG_Ref_NucSeqs,
                                  i_AsmFA_Dict, i_SampleIDs,
                                  MinQueryCov = 0.9, MinQuerySeqID = 0.9):
     """
-    This function takes in a gene presence/absence dataframe, a dictionary of protein-coding gene reference sequences, a dictionary of sample-specific genome assemblies, a list of sample IDs, and optional parameters for minimum query coverage and minimum query sequence identity. It searches the genome assemblies for each absent gene in each sample, and updates the gene presence/absence dataframe accordingly. If a gene sequence is found with high confidence, the gene is marked as "not present" at the protein level but "present" at the DNA level. The function returns the updated gene presence/absence dataframe.
+    This function takes in i) a gene presence/absence dataframe,
+                           ii) a dictionary of protein-coding gene reference sequences,
+                           iii) a dictionary of sample-specific genome assemblies,
+                           iv) a list of sample IDs,
+                           and optional parameters
+                           v) for minimum query coverage
+                           vi) and minimum query sequence identity. 
+                           
+    It searches the genome assemblies for each absent gene in each sample,
+    and updates the gene presence/absence dataframe accordingly. 
+    If a gene sequence is found with high confidence, the gene is marked as "not present" at the protein level but "present" at the DNA level.
+    The function returns the updated gene presence/absence dataframe.
 
     Args:
     - i_Gene_PresAbs_DF: pandas DataFrame containing gene presence/absence information for each sample. The DataFrame should have the following columns: "Gene" (gene name), "NumTotalGenomes" (total number of genomes), and one column for each sample ID containing 0 (absent) or 1 (present) to indicate gene presence/absence.
@@ -73,8 +78,16 @@ def PresAbsQC_CheckAsmForGeneSeq(i_Gene_PresAbs_DF, i_PG_Ref_NucSeqs,
 
     Returns:
     - i_Gene_PresAbs_DF_Updated: pandas DataFrame containing updated gene presence/absence information for each sample. The DataFrame has the same columns as i_Gene_PresAbs_DF, plus an additional column "NumAsm_WiGene_DNASeq" containing the number of samples in which the gene sequence was found with high confidence.
+
     """
-                                     
+
+    # Assert that sequence IDs (gene names) are identical between the gene presence CSV & the pan-enome reference fasta
+    PG_Ref_SeqIDs_Set = set(sorted(list(i_PG_Ref_NucSeqs.keys())))
+    PresMatrix_SeqIDs_Set = set(list(i_Gene_PresAbs_DF.index))
+    
+    ErrorMessage = "ERROR: The geneIDs in the gene presence/absence matrix does not match the provided nucleotide reference FASTA."
+    assert PG_Ref_SeqIDs_Set == PresMatrix_SeqIDs_Set, ErrorMessage
+
     i_Gene_PresAbs_DF_Updated = i_Gene_PresAbs_DF.copy().set_index("Gene", drop=False)
     
     for i_SampleID in tqdm(i_SampleIDs) :
@@ -82,9 +95,9 @@ def PresAbsQC_CheckAsmForGeneSeq(i_Gene_PresAbs_DF, i_PG_Ref_NucSeqs,
         i_Alner_Asm = mp.Aligner(i_AsmFA_Dict[i_SampleID], preset="asm10")  # load or build index
         if not i_Alner_Asm: raise Exception(f"ERROR: failed to load/build index for SR Asm - {i_SampleID}")
         
-        i_Sample_GenePres = i_Gene_PresAbs_DF.set_index("Gene")[i_SampleID]
+        i_SampleOnly_GenePres = i_Gene_PresAbs_DF.set_index("Gene")[i_SampleID]
         
-        i_AbsentGenes = list( i_Sample_GenePres[i_Sample_GenePres == 0].index)
+        i_AbsentGenes = list( i_SampleOnly_GenePres[i_SampleOnly_GenePres == 0].index)
         
         for gene in i_AbsentGenes:
         
@@ -102,6 +115,70 @@ def PresAbsQC_CheckAsmForGeneSeq(i_Gene_PresAbs_DF, i_PG_Ref_NucSeqs,
     i_Gene_PresAbs_DF_Updated["NumAsm_WiGene_DNASeq"] = i_Gene_PresAbs_DF_Updated[i_SampleIDs].applymap(lambda x: 1 if x > 0 else 0).sum(axis = 1)
 
     return i_Gene_PresAbs_DF_Updated
+
+
+
+
+def create_AsmFA_PATH_Dict(i_AsmFA_TSV):
+    AsmFA_DF = pd.read_csv(i_AsmFA_TSV, sep="\t")
+    AsmFA_Dict = dict(AsmFA_DF[['SampleID', 'Genome_ASM_PATH']].values)
+    return AsmFA_Dict
+
+PresAbs_NonSampleID_ColNames = ['Gene', 'NumAsm_WiGene', 'NumAsm_WiGene_DNASeq',
+                                'Non-unique Gene name', 'Annotation', 'No. isolates',
+                                'No. sequences', 'Avg sequences per isolate', 'Genome Fragment',
+                                'Order within Fragment', 'Accessory Fragment', 'Accessory Order with Fragment', 'QC',
+                                'Min group size nuc', 'Max group size nuc', 'Avg group size nuc']
+
+def asmseqcheck_frompaths(i_Gene_PresAbs_CSV_PATH,
+                            i_PG_Ref_FA_PATH,
+                            i_AsmFA_TSV,
+                            MinQueryCov, MinQuerySeqID):
+    """
+    Searches for gene sequences in genome assemblies and returns a DataFrame with presence/absence information.
+
+    Args:
+        i_Gene_PresAbs_CSV_PATH (str): Path to the gene presence/absence matrix CSV file.
+        i_PG_Ref_FA_PATH (str): Path to the pan-genome (nucleotide) reference fasta file.
+        i_AsmFA_TSV (str): Path to the TSV file containing the genome assembly fasta file paths.
+        MinQueryCov (float): Minimum query coverage required for a gene sequence to be considered present.
+        MinQuerySeqID (float): Minimum query sequence identity required for a gene sequence to be considered present.
+
+    Returns:
+        pandas.DataFrame: A DataFrame with presence/absence information for each gene in each sample.
+    """
+
+    # 1) Parse in Gene Pres/Abs matrix and select sampleIDs
+
+    logging.info("Parsing input gene presence/absence matrix...")
+    Gene_PresAbs_DF = parse_PresAbs_CSV_General(i_Gene_PresAbs_CSV_PATH)
+    
+    i_SampleIDs = get_columns_excluding(Gene_PresAbs_DF, PresAbs_NonSampleID_ColNames)
+
+    logging.info("Finished parsing gene presence/absence matrix\n")
+
+    # 2) Read in pan-genome (nucleotide) reference fasta
+    logging.info("Parsing input gene reference fasta")
+    PG_Ref_NucSeqs = parse_PG_Ref_FA(i_PG_Ref_FA_PATH)
+    logging.info("Finished parsing gene reference fasta\n")
+
+    # 3) Read in genome assembly fasta PATH TSV, convert to dict
+    logging.info("Parsing TSV of input assembly PATHs")
+    AsmFA_Dict = create_AsmFA_PATH_Dict(i_AsmFA_TSV)
+    logging.info("Finished parsing input assembly PATHs \n")
+
+    logging.info("Running alignments to check for gene sequences in assemblies...")
+
+    Gene_PresAbs_WiAsmSeqCheck_DF = PresAbsQC_CheckAsmForGeneSeq(Gene_PresAbs_DF, PG_Ref_NucSeqs,
+                                                                AsmFA_Dict, i_SampleIDs,
+                                                                MinQueryCov, MinQuerySeqID)
+
+    logging.info("Finished searching for gene sequences in assemblies \n")
+
+
+    return Gene_PresAbs_WiAsmSeqCheck_DF
+
+
 
 
 
@@ -125,6 +202,14 @@ def SRAsm_PresAbsQC_CheckInLRAsm(i_SR_Gene_PresAbs_DF, i_SR_PG_Ref_NucSeqs,
     Returns:
     - i_SR_Gene_PresAbs_DF_Updated: pandas DataFrame containing the updated gene presence/absence matrix for each sample,
     with additional column indicating the number of genome assemblies where the gene was found.
+
+    Note on output values in Presence/Absence matrix:
+    - 0 means CDS AA seq & DNA seq not found in SR
+    - 1 means CDS AA seq present in SR
+    - 3 Means DNA Seq "Not in SR, but In LR Asm", ("Incomplete Assembly")
+    - 4 Means DNA Seq "In SR Asm, NOT In LR Asm" 
+    - 5 Means DNA Seq "In SR Asm, In LR Asm" ("Annotation Discrepancy")
+
     """
 
     TotalNum_All_SR_MissingGenes = 0
@@ -203,7 +288,7 @@ def SRAsm_PresAbsQC_CheckInLRAsm(i_SR_Gene_PresAbs_DF, i_SR_PG_Ref_NucSeqs,
     print("Across all samples, total missing genes - In SR Asm, Not in LR Asm:", TotalNum_All_Abs_InSR_NotInLR)
     print("Across all samples, total missing genes - In BOTH SR Asm and LR Asm:", TotalNum_All_Abs_InSRandLR)
     
-    i_SR_Gene_PresAbs_DF_Updated["NumAsm_WiGene_DNASeq"] = i_SR_Gene_PresAbs_DF_Updated[ListOf_SampleID_Cols].applymap(lambda x: 1 if x in [1, 4, 5] else 0).sum(axis = 1)
+    i_SR_Gene_PresAbs_DF_Updated["NumAsm_WiGene_DNASeq"] = i_SR_Gene_PresAbs_DF_Updated[i_SampleIDs].applymap(lambda x: 1 if x in [1, 4, 5] else 0).sum(axis = 1)
     
     return i_SR_Gene_PresAbs_DF_Updated
 
@@ -244,6 +329,55 @@ def get_SRAsm_Vs_LRAsm_QCStats(i_Gene_PresAbs_DF, i_SampleIDs, print_stats = Tru
 
     
     return N_AbsentCDS, N_PresentCDS, N_AbsentCDS_DNASeq_NotInSR_InLR, N_AbsentCDS_DNASeq_InSR_NotInLR, N_AbsentCDS_DNASeq_InSR_InLR
+
+
+
+def get_AsmSeqCheck_QCStats(i_Gene_PresAbs_DF, print_stats = True): # i_SampleIDs
+
+    i_SampleIDs = get_columns_excluding(i_Gene_PresAbs_DF, PresAbs_NonSampleID_ColNames)
+
+    N_AbsentCDS = (i_Gene_PresAbs_DF[i_SampleIDs] == 0).sum().sum()  
+    N_PresentCDS = (i_Gene_PresAbs_DF[i_SampleIDs] == 1).sum().sum()  
+    
+    N_AbsentCDS_DNASeq_InAsm = (i_Gene_PresAbs_DF[i_SampleIDs] == 2).sum().sum()  
+
+    N_AnyType_AbsentCDS = (i_Gene_PresAbs_DF[i_SampleIDs] != 1).sum().sum()  
+
+    if print_stats:
+        print("# of absent genes (CDS and DNA level):", N_AbsentCDS, round(N_AbsentCDS/ N_AnyType_AbsentCDS, 4))
+        print("# of present genes (CDS):", N_PresentCDS)
+    
+        print("# of absent genes (but DNA seq found in Asm):", 
+              N_AbsentCDS_DNASeq_InAsm,
+              round(N_AbsentCDS_DNASeq_InAsm / N_AnyType_AbsentCDS, 4))
+    
+        print("# of TOTAL absent genes (At Any Level):", N_AnyType_AbsentCDS)
+
+    
+    return N_AbsentCDS, N_PresentCDS, N_AbsentCDS_DNASeq_InAsm, N_AnyType_AbsentCDS
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

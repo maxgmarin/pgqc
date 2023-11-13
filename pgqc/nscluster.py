@@ -4,6 +4,12 @@ import networkx as nx
 import pandas as pd
 import numpy as np
 
+import time 
+
+import logging
+# Set the logging level to INFO
+logging.basicConfig(level=logging.INFO)
+
 
 def create_MaxKmerSim_JC_Dict(in_AvA_DF):
 
@@ -208,6 +214,16 @@ def clusterBy_KmerJC(in_AvA_DF, i_Gene_PresAbs_DF, JC_threshold):
     i_Gene_PresAbs_NSC_Filt_DF = make_NS_ClusterMerged_Pres_DF(i_Gene_PresAbs_DF, Filt_Cluster_DF)
     
     return i_Gene_PresAbs_NSC_Filt_DF, ClusterInfoGraph
+
+
+
+
+def run_nscluster():
+    print("not yet implemented")
+    return None
+
+
+
 
 
 
