@@ -1,5 +1,6 @@
-# pgqc: Pan-genome Quality Control Toolkit
-Pan-genome quality control (PQQC) is a toolkit for evaluation of DNA sequence redundancy in analyzed pan-genomes (Panaroo or Roary).
+# pgqc: A toolkit for quality control and adjustment of nucleotide redundancy in bacterial pan-genome estimates.
+
+Pan-Genome quality control (PQQC) is a toolkit for evaluation of DNA sequence redundancy in analyzed pan-genomes (Panaroo or Roary).
 
 ## Description
 ![PGQC_NRA_Diagram](Images/PGQC_NRA_Diagram.png)
