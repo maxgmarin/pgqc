@@ -22,7 +22,7 @@ pip install .
 ## Usage
 `pgqc` has 3 sub-commands: `asmseqcheck`, `ava`, `nscluster`
 
-### a) `` - Perform alignment of all absent genes to all assemblies used in a pan-genome analysis.
+### a) `asmseqcheck` - Perform alignment of all absent genes to all assemblies used in a pan-genome analysis.
 ```
 usage: pgqc asmseqcheck [-h] -a IN_ASSEMBLIES -r IN_PG_REF -m IN_GENE_MATRIX -o OUT_GENE_MATRIX_WI_GENESEQCHECK [-c MIN_QUERY_COV] [-i MIN_SEQ_ID]
 
@@ -42,7 +42,7 @@ optional arguments:
                         Minimum sequence identity to classify a gene as present within an assembly (0-1)
 ```
 
-### b) `` - Perform all vs all comparison of k-mer profile of all gene sequences of a pan-genome
+### b) `ava` - Perform all vs all comparison of k-mer profile of all gene sequences of a pan-genome
 ```
 usage: pgqc ava [-h] -i IN_PG_REF -o OUT_AVA_TSV [-k KMER_SIZE]
 
