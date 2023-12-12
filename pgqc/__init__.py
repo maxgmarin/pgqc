@@ -19,6 +19,7 @@ from .asm_gene_search import asmseqcheck_frompaths, get_AsmSeqCheck_QCStats
 
 import pandas as pd
 
+
 def _ava_cli(args):
     ## 1) Set input parameters and PATHs ####
     input_PG_Ref_FA = args.in_pg_ref
@@ -76,7 +77,7 @@ def _nscluster_cli(args):
     ## 1) Set input parameters and PATHs ####
     in_AvA_TSV = args.in_ava_tsv
 
-    gene_matrix_ASC_TSV = args.in_gene_matrix
+    gene_matrix_ASC_TSV = args.in_gene_matrix_tsv
 
     ksim_cluster_thresh = args.min_ksim
 
@@ -147,11 +148,12 @@ def main():
                             help="k-mer size (bp) to use for generating profile of unique k-mers for each sequence (Default: 31))")
     ava_parser.set_defaults(func=_ava_cli)
 
+
     cluster_parser = sub_parser.add_parser("nscluster")
     cluster_parser.add_argument('-a', '--in_ava_tsv',type=str, required=True,
                             help="Input table with all vs all comparison of sequence k-mer profiles. (TSV)")
 
-    cluster_parser.add_argument('-m', '--in_gene_matrix',type=str, required=True,
+    cluster_parser.add_argument('-m', '--in_gene_matrix_tsv',type=str, required=True,
                                     help="Input pan-genome gene presence/absence matrix (CSV). \n NOTE: 2 reflects that similar gene sequence is present at the nucleotide level (CSV)")
 
     cluster_parser.add_argument('--min_ksim',type=float, default=0.8,
@@ -161,8 +163,13 @@ def main():
                             help="Nucleotide Similarity Cluster adjusted Gene Presence Matrix (TSV/Rtab)")
 
     cluster_parser.add_argument('-c', '--out_clusterinfo_tsv',type=str, required=True,
-                            help='Summary table with all genes that belong to a NSC (Nucleotide Similarity Cluster)" (TSV)')
+                            help='Summary table with all genes that belong to a NSC (Nucleotide Similarity Cluster) (TSV)')
     cluster_parser.set_defaults(func=_nscluster_cli)
+
+    # Check if no arguments were provided, if so exit with help message
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(0)
 
     args = parser.parse_args()
     args.func(args)
