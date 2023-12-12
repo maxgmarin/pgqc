@@ -14,9 +14,10 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 from .ava import ava
-from .nscluster import run_nscluster
+from .nscluster import clusterBy_KmerJC
 from .asm_gene_search import asmseqcheck_frompaths, get_AsmSeqCheck_QCStats
 
+import pandas as pd
 
 def _ava_cli(args):
     ## 1) Set input parameters and PATHs ####
@@ -32,12 +33,6 @@ def _ava_cli(args):
     ## Output the AvA comparison table
     logging.info(f" Saving the All vs All comparison table (TSV) to: {output_AvA_TSV}")
     PG_AvA_DF.to_csv(output_AvA_TSV, sep = "\t", index = False)
-
-
-def _nscluster_cli(args):
-
-    #run_nscluster()
-    print("not yet implemented")
 
 
 def _asmseqcheck_cli(args):
@@ -75,6 +70,45 @@ def _asmseqcheck_cli(args):
     Gene_PresAbs_WiAsmSeqCheck_DF.to_csv(output_PresAbs_WiDNASeqCheck,
                                          sep = "\t",
                                          index = False)
+
+def _nscluster_cli(args):
+
+    ## 1) Set input parameters and PATHs ####
+    in_AvA_TSV = args.in_ava_tsv
+
+    gene_matrix_ASC_TSV = args.in_gene_matrix
+
+    ksim_cluster_thresh = args.min_ksim
+
+    out_nsc_gene_matrix_TSV = args.out_nsc_gene_matrix
+
+    out_cluster_tsv = args.out_clusterinfo_tsv
+
+
+    # 2) Read in the input files as dataframes
+
+    in_AvA_DF = pd.read_csv(in_AvA_TSV, sep = "\t")
+
+    i_Gene_PresAbs_DF = pd.read_csv(gene_matrix_ASC_TSV, sep = "\t")
+
+    # 3) Run the nucleotide similarity clustering and produce updated Presence/Absence matrix + cluster info
+    PresAbs_NSC_DF, ClusterInfoGraphDict  = clusterBy_KmerJC(in_AvA_DF,
+                                                             i_Gene_PresAbs_DF,
+                                                             ksim_cluster_thresh)
+
+    ClusterInfo_DF = ClusterInfoGraphDict["Filt_Cluster_DF"]
+
+    # 4) Output matrix and cluster info
+
+    # Output the NSC updated Presence/Absence matrix
+    PresAbs_NSC_DF.to_csv(gene_matrix_ASC_TSV,
+                          sep = "\t", index = False)
+
+    # Output the cluster info table
+    ClusterInfo_DF.to_csv(out_cluster_tsv,
+                          sep = "\t", index = False)
+
+
 
 
 
@@ -114,6 +148,20 @@ def main():
     ava_parser.set_defaults(func=_ava_cli)
 
     cluster_parser = sub_parser.add_parser("nscluster")
+    cluster_parser.add_argument('-a', '--in_ava_tsv',type=str, required=True,
+                            help="Input table with all vs all comparison of sequence k-mer profiles. (TSV)")
+
+    cluster_parser.add_argument('-m', '--in_gene_matrix',type=str, required=True,
+                                    help="Input pan-genome gene presence/absence matrix (CSV). \n NOTE: 2 reflects that similar gene sequence is present at the nucleotide level (CSV)")
+
+    cluster_parser.add_argument('--min_ksim',type=float, default=0.8,
+                            help='Minimum k-mer similarity (maximum Jaccard Similarity of k-mers between pair of sequences) to cluster sequences into the same "nucleotide similarity cluster" (Default: 0.8))')
+
+    cluster_parser.add_argument('-o', '--out_nsc_gene_matrix',type=str, required=True,
+                            help="Nucleotide Similarity Cluster adjusted Gene Presence Matrix (TSV/Rtab)")
+
+    cluster_parser.add_argument('-c', '--out_clusterinfo_tsv',type=str, required=True,
+                            help='Summary table with all genes that belong to a NSC (Nucleotide Similarity Cluster)" (TSV)')
     cluster_parser.set_defaults(func=_nscluster_cli)
 
     args = parser.parse_args()

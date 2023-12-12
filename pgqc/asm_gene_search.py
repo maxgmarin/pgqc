@@ -117,12 +117,18 @@ def PresAbsQC_CheckAsmForGeneSeq(i_Gene_PresAbs_DF, i_PG_Ref_NucSeqs,
     return i_Gene_PresAbs_DF_Updated
 
 
-
-
 def create_AsmFA_PATH_Dict(i_AsmFA_TSV):
     AsmFA_DF = pd.read_csv(i_AsmFA_TSV, sep="\t")
     AsmFA_Dict = dict(AsmFA_DF[['SampleID', 'Genome_ASM_PATH']].values)
     return AsmFA_Dict
+
+def create_LRandSR_AsmFA_PATH_Dict(i_AsmFA_LRandSR_TSV):
+    AsmFA_LRandSR_DF = pd.read_csv(i_AsmFA_LRandSR_TSV, sep="\t")
+
+    LR_AsmFA_Dict = dict(AsmFA_LRandSR_DF[['SampleID', 'Genome_LR_ASM_PATH']].values)
+    SR_AsmFA_Dict = dict(AsmFA_LRandSR_DF[['SampleID', 'Genome_SR_ASM_PATH']].values)
+
+    return LR_AsmFA_Dict, SR_AsmFA_Dict
 
 PresAbs_NonSampleID_ColNames = ['Gene', 'NumAsm_WiGene', 'NumAsm_WiGene_DNASeq',
                                 'Non-unique Gene name', 'Annotation', 'No. isolates',
@@ -166,7 +172,8 @@ def asmseqcheck_frompaths(i_Gene_PresAbs_CSV_PATH,
     logging.info("Parsing TSV of input assembly PATHs")
     AsmFA_Dict = create_AsmFA_PATH_Dict(i_AsmFA_TSV)
     logging.info("Finished parsing input assembly PATHs \n")
-
+    
+    # 4) Run alignments to check for gene sequences in assemblies
     logging.info("Running alignments to check for gene sequences in assemblies...")
 
     Gene_PresAbs_WiAsmSeqCheck_DF = PresAbsQC_CheckAsmForGeneSeq(Gene_PresAbs_DF, PG_Ref_NucSeqs,
@@ -178,6 +185,44 @@ def asmseqcheck_frompaths(i_Gene_PresAbs_CSV_PATH,
 
     return Gene_PresAbs_WiAsmSeqCheck_DF
 
+
+
+
+
+def SRandLRQC_asmseqcheck_frompaths(i_SR_Gene_PresAbs_CSV_PATH,
+                                    i_SR_PG_Ref_FA_PATH,
+                                    i_AsmFA_LRandSR_TSV,
+                                    MinQueryCov, MinQuerySeqID):
+
+    # 1) Parse in Gene Pres/Abs matrix and select sampleIDs
+
+    logging.info("Parsing input gene presence/absence matrix...")
+    SR_Gene_PresAbs_DF = parse_PresAbs_CSV_General(i_SR_Gene_PresAbs_CSV_PATH)
+    
+    i_SampleIDs = get_columns_excluding(SR_Gene_PresAbs_DF, PresAbs_NonSampleID_ColNames)
+
+    logging.info("Finished parsing gene presence/absence matrix\n")
+
+    # 2) Read in pan-genome (nucleotide) reference fasta (For SR based analysis)
+    logging.info("Parsing input gene reference fasta")
+    SR_PG_Ref_NucSeqs = parse_PG_Ref_FA(i_SR_PG_Ref_FA_PATH)
+    logging.info("Finished parsing gene reference fasta\n")
+
+    # 3) Read in LR and SR assemblies PATH TSV, convert to dictionaries (For LR and SR based analysis)
+    logging.info("Parsing TSV of input assembly PATHs")
+    LR_AsmFA_Dict, SR_AsmFA_Dict = create_LRandSR_AsmFA_PATH_Dict(i_AsmFA_LRandSR_TSV)
+    logging.info("Finished parsing input assembly PATHs \n")
+
+    # 4) Run alignments to check for gene sequences in assemblies
+    logging.info("Running alignments to check for gene sequences in assemblies...")
+
+    Gene_PresAbs_WiAsmSeqCheck_DF = SRAsm_PresAbsQC_CheckInLRAsm(SR_Gene_PresAbs_DF, SR_PG_Ref_NucSeqs,
+                                                                 LR_AsmFA_Dict, SR_AsmFA_Dict, i_SampleIDs,
+                                                                 MinQueryCov, MinQuerySeqID)
+
+    logging.info("Finished searching for gene sequences in both LR and SR assemblies \n")
+
+    return Gene_PresAbs_WiAsmSeqCheck_DF
 
 
 

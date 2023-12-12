@@ -6,6 +6,9 @@ import numpy as np
 
 import time 
 
+from pgqc.utils import get_columns_excluding
+
+
 import logging
 # Set the logging level to INFO
 logging.basicConfig(level=logging.INFO)
@@ -114,11 +117,19 @@ def create_MST_FiltByJC(in_AvA_DF, i_MaxSim_Dict, threshold ):
     return MST_Filt, clusters
 
 
-def make_NS_ClusterMerged_Pres_DF(i_Gene_PresAbs_DF, i_Filt_Cluster_DF):
+
+PresAbs_NonSampleID_ColNames = ['Gene', 'NumAsm_WiGene', 'NumAsm_WiGene_DNASeq',
+                                'Non-unique Gene name', 'Annotation', 'No. isolates',
+                                'No. sequences', 'Avg sequences per isolate', 'Genome Fragment',
+                                'Order within Fragment', 'Accessory Fragment', 'Accessory Order with Fragment', 'QC',
+                                'Min group size nuc', 'Max group size nuc', 'Avg group size nuc']
+
+
+def make_NS_ClusterMerged_Pres_DF(i_Gene_PresAbs_DF, i_Filt_Cluster_DF, ResetToBinary=True):
     
-    ListOf_SampleID_Cols = list(i_Gene_PresAbs_DF.drop(['Gene', 'NumAsm_WiGene'], axis=1).columns)
+    i_SampleIDs = get_columns_excluding(i_Gene_PresAbs_DF, PresAbs_NonSampleID_ColNames)
     # Extracting the original presence/absence information for genes (excluding the extra rows)
-    original_gene_presence_absence = i_Gene_PresAbs_DF.set_index('Gene')[ListOf_SampleID_Cols]
+    original_gene_presence_absence = i_Gene_PresAbs_DF.set_index('Gene')[i_SampleIDs]
     
     # Checking the unique genes in the cluster information
     clustered_genes = set(i_Filt_Cluster_DF['GeneID'])
@@ -136,10 +147,10 @@ def make_NS_ClusterMerged_Pres_DF(i_Gene_PresAbs_DF, i_Filt_Cluster_DF):
     for gene, row in clustered_gene_presence_absence.iterrows():
         cluster_id = gene_to_clusterID_map.get(gene)
         # Merging the presence/absence information for genes within a cluster
-        merged_cluster_presence_absence[cluster_id] = [max(val, merged_cluster_presence_absence.get(cluster_id, [0] * len(ListOf_SampleID_Cols))[idx]) for idx, val in enumerate(row)]
+        merged_cluster_presence_absence[cluster_id] = [max(val, merged_cluster_presence_absence.get(cluster_id, [0] * len(i_SampleIDs))[idx]) for idx, val in enumerate(row)]
     
     # Converting the merged cluster presence/absence information into a DataFrame
-    merged_cluster_presence_absence_DF = pd.DataFrame.from_dict(merged_cluster_presence_absence, orient='index', columns=ListOf_SampleID_Cols).reset_index().rename(columns={'index': 'Gene'})
+    merged_cluster_presence_absence_DF = pd.DataFrame.from_dict(merged_cluster_presence_absence, orient='index', columns=i_SampleIDs).reset_index().rename(columns={'index': 'Gene'})
     
     # Concatenating with the original presence/absence matrix to include non-clustered genes and extra rows
     final_presence_absence_DF_with_clusters_and_all_info = pd.concat([i_Gene_PresAbs_DF[~i_Gene_PresAbs_DF['Gene'].isin(clustered_genes)], merged_cluster_presence_absence_DF], ignore_index=True)
@@ -149,12 +160,14 @@ def make_NS_ClusterMerged_Pres_DF(i_Gene_PresAbs_DF, i_Filt_Cluster_DF):
     
     PG_Pres_WiNSC_DF = final_presence_absence_DF_with_clusters_and_all_info.copy()
     
-    #PG_Pres_WiNSC_DF["NumAsm_WiGene"] = PG_Pres_WiNSC_DF[ListOf_SampleID_Cols].sum(axis = 1)
+    #PG_Pres_WiNSC_DF["NumAsm_WiGene"] = PG_Pres_WiNSC_DF[i_SampleIDs].sum(axis = 1)
 
-    PG_Pres_WiNSC_DF["NumAsm_WiGene"] = PG_Pres_WiNSC_DF[ListOf_SampleID_Cols].applymap(lambda x: 1 if x > 0 else 0).sum(axis = 1)
+    PG_Pres_WiNSC_DF["NumAsm_WiGene"] = PG_Pres_WiNSC_DF[i_SampleIDs].applymap(lambda x: 1 if x > 0 else 0).sum(axis = 1)
 
-    
     PG_Pres_WiNSC_DF = PG_Pres_WiNSC_DF.sort_values(by='NumAsm_WiGene', ascending=False)
+
+    if ResetToBinary: # This step will reset all NON zero values to 1. (Default Behavior)
+        PG_Pres_WiNSC_DF[i_SampleIDs] = PG_Pres_WiNSC_DF[i_SampleIDs].applymap(lambda x: 1 if x > 0 else 0)
 
     return PG_Pres_WiNSC_DF
 
@@ -190,6 +203,27 @@ def summarize_NSClusters(i_Cluster_DF, i_CoreGenes_List, printStats = True):
 
     return i_ClusterSumm_DF, i_CountOf_ClusterType
 
+def summarize_NSClusters_Simple(i_Cluster_DF, printStats = True):
+
+    i_Cluster_NumGenes = i_Cluster_DF.groupby("NS_ClusterID")["GeneID"].nunique()
+
+    # Create a new summary DF 
+    i_ClusterSumm_DF = pd.concat([i_Cluster_NumGenes,], axis = 1)
+    i_ClusterSumm_DF.columns = ["NumGenes"]
+    
+    i_ClusterSumm_DF = i_ClusterSumm_DF.reset_index()
+
+    if printStats:
+        Num_NSClusters = i_ClusterSumm_DF.shape[0]
+        Num_ClusteredGenes = i_ClusterSumm_DF["NumGenes"].sum()
+
+        print("# NucSim Clusters:", Num_NSClusters)
+        print("# of total clustered genes:", Num_ClusteredGenes)
+
+    return i_ClusterSumm_DF
+
+
+
 
 
 ## Define complete function for clustering and merging of PG matrix
@@ -212,13 +246,18 @@ def clusterBy_KmerJC(in_AvA_DF, i_Gene_PresAbs_DF, JC_threshold):
     # Filt_GenesInACluster = Filt_Cluster_DF["GeneID"]
     
     i_Gene_PresAbs_NSC_Filt_DF = make_NS_ClusterMerged_Pres_DF(i_Gene_PresAbs_DF, Filt_Cluster_DF)
-    
+
     return i_Gene_PresAbs_NSC_Filt_DF, ClusterInfoGraph
 
 
 
 
-def run_nscluster():
+def run_nscluster(in_AvA_DF, i_Gene_PresAbs_DF, JC_threshold = 0.8):
+
+    PresAbs_NSC_Filt08_DF, ClusterInfoGraphDict  = clusterBy_KmerJC(in_AvA_DF, i_Gene_PresAbs_DF, 0.8)
+
+    Filt08_Cluster_DF = ClusterInfoGraphDict["Filt_Cluster_DF"]
+
     print("not yet implemented")
     return None
 
