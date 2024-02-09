@@ -25,7 +25,7 @@ def ava(input_PG_Ref_FA, kmer_size):
 
     ## Calculate the maximum Jaccard Containment (JC) between all pairs of sequences.
     ### NOTE: The maximum JC between sets a and b will always be symetrical, while JC is not
-    print(f"Beginning all vs all comparison of k-mer profiles: {round(time_diff, 2)} seconds")
+    print(f"Beginning all vs all comparison of k-mer profiles:")
 
     start = time.time()
 

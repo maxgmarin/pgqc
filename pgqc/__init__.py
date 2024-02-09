@@ -19,6 +19,8 @@ from .asm_gene_search import asmseqcheck_frompaths, get_AsmSeqCheck_QCStats
 
 import pandas as pd
 
+#from colored import cprint
+from colored import fg, bg, attr
 
 def _nrc_cli(args):
     ## 1) Set input parameters and PATHs ####
@@ -172,10 +174,8 @@ def _nscluster_cli(args):
 
 
 
-
-
 def main():
-    parser = argparse.ArgumentParser(description="Toolkit for focused on augmenting common CDS based pan-genome analysis with nucleotide sequence comparison.")
+    parser = argparse.ArgumentParser(description= fg("blue") + "Toolkit for focused on augmenting common CDS based pan-genome analysis with nucleotide sequence comparison.")
     sub_parser = parser.add_subparsers(required=True, help='Please select one of the pipelines of the PGQC toolkit.')
 
     nrc_parser = sub_parser.add_parser("nrc")
@@ -261,7 +261,6 @@ def main():
 
     # Check if no arguments were provided, if so exit with help message
     if len(sys.argv) == 1:
-        print(sys.argv)
         parser.print_help(sys.stderr)
         sys.exit(0)
 
